@@ -27,3 +27,4 @@ Each agent is its own network service with its own Agent Card, tools, and failur
 
 ## Docs
 [Architecture](docs/ARCHITECTURE.md) | [Plan](docs/IMPLEMENTATION_PLAN.md) | [Work packages](docs/WORK_PACKAGES.md) | [Threat model](docs/THREAT_MODEL.md) | [Evaluation](docs/EVALUATION.md) | [Demo](docs/DEMO_SCRIPT.md) | [Decisions](docs/DECISIONS.md)
+

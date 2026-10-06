@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>A2A Incident Mesh</title>
+  <style>body { font-family: monospace; background: #1e1e1e; color: #fff; padding: 20px; }</style>
+</head>
+<body>
+  <h1>A2A Mesh Coordinator</h1>
+  <button id="dispatch">Dispatch Incident to Mesh</button>
+  <div id="log" style="margin-top: 20px; border: 1px solid #333; padding: 10px; height: 300px; overflow-y: scroll;"></div>
+  <script>
+    const logDiv = document.getElementById('log');
+    function log(msg) { logDiv.innerHTML += <div>\ - \</div>; }
+    
+    document.getElementById('dispatch').onclick = async () => {
+      log('Dispatching incident INC-999...');
+      const res = await fetch('http://localhost:3000/api/dispatch', { method: 'POST' });
+      const data = await res.json();
+      log(Coordinator responded: \);
+    };
+  </script>
+</body>
+</html>
