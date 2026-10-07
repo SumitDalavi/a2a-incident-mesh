@@ -49,3 +49,7 @@ This resolves all behavioral and runtime constraints, ensuring robust CI/CD exec
 - **State Synchronization**: Fixed critical race conditions in SDK state synchronization where cancelled tasks were subsequently reported as completed.
 - **Terminal State Propagation**: Implemented accurate `TASK_STATE_CANCELED` terminal state propagation via direct TaskStore manipulation to prevent executor overwrites.
 - **Test Fidelity**: Converted flaky stream-based cancellation tests into deterministic polling mechanisms for rigorous terminal state verification.
+
+## Phase 6: Deep Routing & Proxy Isolation (Final Validation)
+- **Isolated API Polling**: Closed the API contract gap by ensuring UI task polling routes exclusively through the central Coordinator proxy (`/api/tasks/:agent/:taskId`), rather than directly striking individual agents and breaking the mesh boundary.
+- **Strict Context Routing**: Refactored the ambiguous bidirectional ID map into explicit `taskIdToContextId` and `contextIdToTaskId` data structures within the agents. This ensures cancellations accurately target and terminate the correct underlying execution contexts without bleeding state or leaking resources.
