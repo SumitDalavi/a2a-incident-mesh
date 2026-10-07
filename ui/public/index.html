@@ -1,23 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
   <title>A2A Incident Mesh</title>
-  <style>body { font-family: monospace; background: #1e1e1e; color: #fff; padding: 20px; }</style>
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #1e293b; --text: #f8fafc; --accent: #8b5cf6;
+      --border: #334155; --success: #10b981;
+    }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .card { background: var(--panel); padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; }
+    .topology { display: flex; gap: 20px; justify-content: center; margin: 30px 0; }
+    .node { 
+      background: #2dd4bf; color: #0f172a; padding: 15px; border-radius: 50%; width: 100px; height: 100px; 
+      display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold;
+      box-shadow: 0 0 15px rgba(45, 212, 191, 0.4);
+    }
+    .node.coordinator { background: var(--accent); box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); color: white;}
+    button { background: var(--accent); color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    button:hover { filter: brightness(1.1); }
+    .streams { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .stream-box { background: #000; color: #32cd32; font-family: monospace; padding: 15px; height: 250px; overflow-y: auto; border-radius: 4px; }
+  </style>
 </head>
 <body>
-  <h1>A2A Mesh Coordinator</h1>
-  <button id="dispatch">Dispatch Incident to Mesh</button>
-  <div id="log" style="margin-top: 20px; border: 1px solid #333; padding: 10px; height: 300px; overflow-y: scroll;"></div>
-  <script>
-    const logDiv = document.getElementById('log');
-    function log(msg) { logDiv.innerHTML += <div>\ - \</div>; }
+  <div class="container">
+    <h1>A2A Incident Response Mesh</h1>
     
-    document.getElementById('dispatch').onclick = async () => {
-      log('Dispatching incident INC-999...');
-      const res = await fetch('http://localhost:3000/api/dispatch', { method: 'POST' });
-      const data = await res.json();
-      log(Coordinator responded: \);
-    };
+    <div class="card" style="text-align: center;">
+      <div class="topology">
+        <div class="node">SRE Agent<br><small>Port 4001</small></div>
+        <div class="node coordinator" style="width:120px; height:120px; font-size:1.1em;">Coordinator<br><small>Port 3000</small></div>
+        <div class="node" style="background: #f43f5e; box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);">Security Agent<br><small>Port 4002</small></div>
+      </div>
+      <button onclick="dispatchIncident()">Simulate Incident (Dispatch Tasks)</button>
+    </div>
+
+    <div class="streams" id="streams-container">
+      <!-- Streams will appear here -->
+    </div>
+  </div>
+
+  <script>
+    async function dispatchIncident() {
+      const container = document.getElementById('streams-container');
+      container.innerHTML = 'Delegating tasks...';
+
+      try {
+        const res = await fetch('http://localhost:3000/api/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            incidentId: 'INC-1001',
+            tasks: ['analyze-telemetry', 'check-cves']
+          })
+        });
+        const data = await res.json();
+        
+        container.innerHTML = '';
+        data.delegations.forEach(d => {
+          if (d.status === 'ACCEPTED') {
+            const box = document.createElement('div');
+            box.innerHTML = `<h3>${d.agentName} (${d.taskType})</h3><div class="stream-box" id="${d.taskId}">Connecting stream...</div>`;
+            container.appendChild(box);
+            
+            // Connect SSE via proxy
+            const encodedUrl = encodeURIComponent(d.agentUrl);
+            const evtSource = new EventSource(`http://localhost:3000/api/stream/${encodedUrl}/${d.taskId}`);
+            
+            evtSource.onmessage = function(event) {
+              const msg = JSON.parse(event.data);
+              const logBox = document.getElementById(d.taskId);
+              if (logBox.innerHTML === 'Connecting stream...') logBox.innerHTML = '';
+              logBox.innerHTML += `> [${msg.status}] ${msg.log}<br>`;
+              logBox.scrollTop = logBox.scrollHeight;
+              if (msg.status === 'COMPLETED' || msg.status === 'FAILED') {
+                evtSource.close();
+              }
+            };
+          }
+        });
+      } catch (err) {
+        alert('Failed to dispatch tasks');
+      }
+    }
   </script>
 </body>
 </html>
