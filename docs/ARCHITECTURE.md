@@ -43,3 +43,9 @@ All identified correctness blockers from the initial structural epic phase have 
 - **Resource Cleanup**: Tests properly isolate their artifacts (e.g., dedicated `fs.mkdtempSync` directories) and verify underlying cleanup (e.g., Docker container `inspect` checks).
 - **Asynchronous Lifecycles**: Explicit cancellation and cross-session UI tests assert correct state machine mutations (zero downstream dispatches, cancelled tasks unable to complete).
 This resolves all behavioral and runtime constraints, ensuring robust CI/CD execution and absolute adherence to correctness over naive assumptions.
+
+
+## Phase 5.1 Update: Task Cancellation & State Synchronization
+- **State Synchronization**: Fixed critical race conditions in SDK state synchronization where cancelled tasks were subsequently reported as completed.
+- **Terminal State Propagation**: Implemented accurate `TASK_STATE_CANCELED` terminal state propagation via direct TaskStore manipulation to prevent executor overwrites.
+- **Test Fidelity**: Converted flaky stream-based cancellation tests into deterministic polling mechanisms for rigorous terminal state verification.
