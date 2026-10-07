@@ -93,9 +93,9 @@ const executor = {
   },
   
   async cancelTask(taskId, eventBus) {
-    cancelFlags.set(taskId, true);
     const cId = typeof taskId === 'object' ? taskId.contextId : (contextIds.get(taskId) || '');
     const id = typeof taskId === 'object' ? taskId.taskId : taskId;
+    cancelFlags.set(id, true);
     eventBus.publish(AgentEvent.statusUpdate({
       taskId: id,
       contextId: cId,
