@@ -74,3 +74,8 @@ Aligned agents with A2A SDK v1.0, implemented ClientFactory, corrected AgentEven
 
 * Acceptance tests have been upgraded from static string-checks to end-to-end behavioral verifications.
 * API boundaries and execution layers (Docker, WebSockets, Temporal, etc.) are now explicitly exercised in tests.
+
+## Maturity Claims
+- **Implemented (Tested):** Task cancellation, event stream polling, proxy API routing, SDK interop.
+- **Mocked:** The SRE telemetry and Security CVE checks are interoperability fixtures, not actual deep analysis.
+- **Deferred:** Complete RBAC mesh policies.
