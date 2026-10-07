@@ -11,11 +11,14 @@ app.post('/api/dispatch', async (req, res) => {
   const responses = [];
   for (const agent of AGENTS) {
     try {
-      // 1. Discover capabilities
       const card = await axios.get(\/.well-known/agent-card.json);
-      // 2. Delegate task
-      const task = await axios.post(\/api/v1/tasks, { incidentId: 'INC-999', type: 'analyze' });
-      responses.push({ agent: card.data.name, status: task.data.status });
+      // MSH-03: Negotiation
+      if (card.data.capabilities.includes('analyze-telemetry') || card.data.capabilities.includes('check-cves')) {
+        const task = await axios.post(\/api/v1/tasks, { incidentId: 'INC-999', type: 'analyze' });
+        responses.push({ agent: card.data.name, status: task.data.status });
+      } else {
+        responses.push({ agent: card.data.name, status: 'Ignored: No matching capabilities' });
+      }
     } catch (err: any) {
       responses.push({ agent, error: err.message });
     }
