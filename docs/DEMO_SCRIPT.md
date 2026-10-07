@@ -1,0 +1,7 @@
+# Demo Script
+
+1. **Start the Stack**: Run `make dev` in the root. This starts the Coordinator (3000), SRE Agent (4001), and Security Agent (4002).
+2. **Open UI**: Open `ui/public/index.html` in your browser.
+3. **Dispatch Incident**: Click "Simulate Incident (Dispatch Tasks)".
+4. **Observe Negotiation**: The Coordinator will query the agent cards, determine the SRE agent handles telemetry and the Security agent handles CVEs, and dispatch the tasks simultaneously.
+5. **Live Streaming**: Watch the terminal output in the UI as both agents stream their progressive reasoning steps (SSE) back to the Coordinator in real-time until they reach `COMPLETED`.
