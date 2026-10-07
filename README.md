@@ -56,6 +56,7 @@ See the [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the interactive walkthrough an
 | Mesh trace view in UI | Implemented |
 
 ## Why this is not just "multi-agent"
+> **Note on Simulated Capabilities:** The underlying SRE and Security tasks performed by the agents (e.g., telemetry queries, CVE scanning) are strictly **interoperability fixtures** designed to demonstrate the A2A protocol and coordination layer. They do not perform real-world CVE scanning or live production telemetry analysis in this demo.
 Each agent is its own network service with its own Agent Card, tools, and failure behavior. The coordinator knows only what the cards advertise.
 
 ## 👨‍💻 Author

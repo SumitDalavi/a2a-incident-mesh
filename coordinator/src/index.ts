@@ -73,4 +73,17 @@ app.post('/api/dispatch', async (req, res) => {
   res.json({ success: true, delegations });
 });
 
+app.get('/api/tasks/:agentName/:taskId', async (req, res) => {
+  const { agentName, taskId } = req.params;
+  const url = agentName === 'sre-agent' ? 'http://localhost:4001' : 'http://localhost:4002';
+  try {
+    const factory = new ClientFactory();
+    const client = await factory.createFromUrl(url, undefined, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+    const taskResponse = await client.getTask({ id: taskId }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+    res.json(taskResponse.task || taskResponse);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(3000, () => console.log('Coordinator API running on port 3000'));

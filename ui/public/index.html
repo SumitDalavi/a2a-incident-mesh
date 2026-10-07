@@ -79,24 +79,15 @@
             box.innerHTML = `<h3>${d.agent} (${d.taskReq})</h3><div class="stream-box" id="${d.taskId}">Connecting stream...</div>`;
             container.appendChild(box);
             
-            // Reconstruct Agent URL based on taskReq
-            const agentUrl = d.taskReq === 'analyze-telemetry' ? 'http://localhost:4001' : 'http://localhost:4002';
-            
-            // Connect SSE directly to agent using Bearer token
-            // Note: EventSource doesn't support custom headers easily. 
-            // The agents' index.js accepts 'mesh-secret-token'. 
-            // In a real app, we'd use fetch() to stream, but EventSource might bypass auth if we don't handle it.
-            // Wait, the agent code says: `if (!auth || auth !== 'Bearer mesh-secret-token') { return res.status(401).json({ error: 'Unauthorized' }); }`
-            // So we must use fetch to stream JSON!
+            // Route polling through the coordinator's proxy
+            const agentName = d.taskReq === 'analyze-telemetry' ? 'sre-agent' : 'sec-agent';
             
             const logBox = document.getElementById(d.taskId);
             
             async function consumeStream() {
               const poll = setInterval(async () => {
                  try {
-                    const response = await fetch(`${agentUrl}/v1/agent/tasks/${d.taskId}`, {
-                      headers: { 'Authorization': 'Bearer mesh-secret-token' }
-                    });
+                    const response = await fetch(`http://localhost:3000/api/tasks/${agentName}/${d.taskId}`);
                     const msg = await response.json();
                     
                     logBox.innerHTML = '';

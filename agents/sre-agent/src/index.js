@@ -20,7 +20,8 @@ const agentCard = {
 
 const taskStore = new InMemoryTaskStore();
 const cancelFlags = new Map();
-const contextIds = new Map();
+const taskIdToContextId = new Map();
+const contextIdToTaskId = new Map();
 
 const executor = {
   async execute(requestContext, eventBus) {
@@ -28,8 +29,8 @@ const executor = {
     const taskId = requestContext.taskId || 'sre-task-' + Date.now();
     const type = requestContext.task?.type || requestContext.message?.text || 'analyze-telemetry';
     const cId = requestContext.contextId || require('crypto').randomUUID();
-    contextIds.set(taskId, cId);
-    contextIds.set(cId, taskId); // Reverse mapping
+    taskIdToContextId.set(taskId, cId);
+    contextIdToTaskId.set(cId, taskId);
     
     cancelFlags.set(taskId, false);
     
@@ -97,17 +98,11 @@ const executor = {
     let id = typeof taskIdInput === 'object' ? taskIdInput.taskId : taskIdInput;
     let cId = typeof taskIdInput === 'object' ? taskIdInput.contextId : '';
     
-    // If the input string was actually a contextId, find the real taskId
-    if (!cId && id && contextIds.get(id) && contextIds.get(contextIds.get(id)) === id) {
-       // id is a real taskId, cId is contextIds.get(id)
-       cId = contextIds.get(id);
-    } else if (!cId && id) {
-       // id might be a contextId
-       const possibleTaskId = contextIds.get(id);
-       if (possibleTaskId) {
-         cId = id;
-         id = possibleTaskId;
-       }
+    if (!cId && id && taskIdToContextId.has(id)) {
+       cId = taskIdToContextId.get(id);
+    } else if (!cId && id && contextIdToTaskId.has(id)) {
+       cId = id;
+       id = contextIdToTaskId.get(id);
     }
     cancelFlags.set(id, true);
     

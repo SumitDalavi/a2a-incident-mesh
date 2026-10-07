@@ -52,31 +52,34 @@ async function run() {
   if (firstResult.done) throw new Error("No initial task returned");
   
   const taskId2 = firstResult.value.payload?.value?.id || firstResult.value.payload?.value?.taskId;
+  const contextId2 = firstResult.value.payload?.value?.contextId;
   if (!taskId2) throw new Error("Could not extract taskId from initial stream chunk");
   
-  console.log(`Task 2 initialized with taskId: ${taskId2}`);
+  console.log(`Task 2 initialized with taskId: ${taskId2}, contextId: ${contextId2}`);
 
   // 2. Wait a moment to ensure it's in working state inside the agent loop
   await new Promise(r => setTimeout(r, 1000));
 
   // 3. Cancel the task
   console.log(`Cancelling task ${taskId2}...`);
-  await client.cancelTask({ id: taskId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+  await client.cancelTask({ id: taskId2, contextId: contextId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
 
   let cancelledTask2 = false;
   let failedCancellation = false;
 
-  // 4. Poll getTask to observe the CANCELED state
-  for (let i = 0; i < 10; i++) {
+  // 4. Poll getTask to observe the CANCELED state, and verify no late completion
+  for (let i = 0; i < 15; i++) {
     await new Promise(r => setTimeout(r, 500));
     const taskResponse = await client.getTask({ id: taskId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
     const state = taskResponse.task?.status?.state ?? taskResponse.status?.state;
     console.log(`Polled Task 2 state: ${state}`);
     
     if (state === TaskState.TASK_STATE_CANCELED) {
-      console.log("Task 2 explicitly canceled.");
+      if (!cancelledTask2) {
+          console.log("Task 2 explicitly canceled. Continuing polling to ensure no late completion...");
+      }
       cancelledTask2 = true;
-      break;
+      // Do NOT break, ensure we don't get COMPLETED later
     } else if (state === TaskState.TASK_STATE_COMPLETED) {
       failedCancellation = true;
       break;
