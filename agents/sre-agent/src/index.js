@@ -29,6 +29,7 @@ const executor = {
     const type = requestContext.task?.type || requestContext.message?.text || 'analyze-telemetry';
     const cId = requestContext.contextId || require('crypto').randomUUID();
     contextIds.set(taskId, cId);
+    contextIds.set(cId, taskId); // Reverse mapping
     
     cancelFlags.set(taskId, false);
     
@@ -64,7 +65,7 @@ const executor = {
       }
       eventBus.publish(AgentEvent.statusUpdate({
         taskId,
-        contextId: requestContext.contextId,
+        contextId: cId,
         status: { 
           state: TaskState.TASK_STATE_WORKING,
           message: {
@@ -79,7 +80,7 @@ const executor = {
     if (!cancelFlags.get(taskId)) {
       eventBus.publish(AgentEvent.statusUpdate({
         taskId,
-        contextId: requestContext.contextId,
+        contextId: cId,
         status: { 
           state: TaskState.TASK_STATE_COMPLETED,
           message: {
@@ -92,10 +93,35 @@ const executor = {
     }
   },
   
-  async cancelTask(taskId, eventBus) {
-    const cId = typeof taskId === 'object' ? taskId.contextId : (contextIds.get(taskId) || '');
-    const id = typeof taskId === 'object' ? taskId.taskId : taskId;
+  async cancelTask(taskIdInput, eventBus) {
+    let id = typeof taskIdInput === 'object' ? taskIdInput.taskId : taskIdInput;
+    let cId = typeof taskIdInput === 'object' ? taskIdInput.contextId : '';
+    
+    // If the input string was actually a contextId, find the real taskId
+    if (!cId && id && contextIds.get(id) && contextIds.get(contextIds.get(id)) === id) {
+       // id is a real taskId, cId is contextIds.get(id)
+       cId = contextIds.get(id);
+    } else if (!cId && id) {
+       // id might be a contextId
+       const possibleTaskId = contextIds.get(id);
+       if (possibleTaskId) {
+         cId = id;
+         id = possibleTaskId;
+       }
+    }
     cancelFlags.set(id, true);
+    
+    // We must manually update the taskStore so DefaultRequestHandler doesn't overwrite it to COMPLETED
+    try {
+      const task = await taskStore.load(id, { headers: new Headers() });
+      if (task) {
+         task.status = { state: 5 /* TASK_STATE_CANCELED */ };
+         await taskStore.save(task, { headers: new Headers() });
+      }
+    } catch(e) {
+      console.error("Could not update taskStore on cancel", e);
+    }
+
     eventBus.publish(AgentEvent.statusUpdate({
       taskId: id,
       contextId: cId,
@@ -120,6 +146,12 @@ const handler = new DefaultRequestHandler(
 const app = express();
 app.use(express.json({ type: ['application/json', 'application/a2a+json'] }));
 app.use(cors());
+
+app.use((req, res, next) => {
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.setHeader('Cache-Control', 'no-cache');
+  next();
+});
 
 app.use((req, res, next) => {
   if (req.path === '/.well-known/agent-card.json') return next();

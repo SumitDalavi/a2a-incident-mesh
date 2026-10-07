@@ -25,7 +25,7 @@ async function run() {
   for await (const status of stream1) {
     if (status.payload?.$case === 'task' || status.payload?.$case === 'statusUpdate') {
        const state = status.payload.value.status?.state || status.payload.value.state;
-       console.log(`Task 1 state:`, state);
+       console.log(`Task 1 state:`, state, JSON.stringify(status.payload));
        if (state === TaskState.TASK_STATE_COMPLETED) {
            console.log("Task 1 explicitly completed.");
            completedTask1 = true;
@@ -39,35 +39,47 @@ async function run() {
 
   console.log('Sending task for cancellation...');
   const reqId = require('crypto').randomUUID();
-  const stream2 = client.sendMessageStream({
-    message: { messageId: reqId, text: 'analyze-telemetry' }
+
+
+
+  // 1. Initialize task using sendMessageStream with returnImmediately
+  const initStream = client.sendMessageStream({
+    message: { messageId: reqId, text: 'analyze-telemetry' },
+    configuration: { returnImmediately: true }
   }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
 
-  let taskId2 = null;
+  const firstResult = await initStream.next();
+  if (firstResult.done) throw new Error("No initial task returned");
+  
+  const taskId2 = firstResult.value.payload?.value?.id || firstResult.value.payload?.value?.taskId;
+  if (!taskId2) throw new Error("Could not extract taskId from initial stream chunk");
+  
+  console.log(`Task 2 initialized with taskId: ${taskId2}`);
+
+  // 2. Wait a moment to ensure it's in working state inside the agent loop
+  await new Promise(r => setTimeout(r, 1000));
+
+  // 3. Cancel the task
+  console.log(`Cancelling task ${taskId2}...`);
+  await client.cancelTask({ id: taskId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+
   let cancelledTask2 = false;
   let failedCancellation = false;
 
-  const t2 = setTimeout(() => { if (!cancelledTask2) { console.error("Timeout on Task 2"); process.exit(1); } }, 10000);
-
-  for await (const status of stream2) {
-    if (status.payload?.$case === 'task' || status.payload?.$case === 'statusUpdate') {
-       const state = status.payload.value.status?.state || status.payload.value.state;
-       taskId2 = status.payload.value.id || status.payload.value.taskId || taskId2;
-       const contextId2 = status.payload.value.contextId; // use returned context
-       console.log(`Task 2 created/updated: ${taskId2}, state: ${state}`);
-       
-       if (!cancelledTask2 && taskId2 && status.payload?.$case === 'task') {
-          console.log(`Cancelling task ${taskId2}...`);
-          client.cancelTask({ taskId: taskId2, contextId: contextId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } }).catch(e => console.error(e));
-       }
-
-       if (state === TaskState.TASK_STATE_CANCELED) {
-           console.log("Task 2 explicitly canceled.");
-           cancelledTask2 = true;
-           clearTimeout(t2);
-       } else if (state === TaskState.TASK_STATE_COMPLETED) {
-           failedCancellation = true;
-       }
+  // 4. Poll getTask to observe the CANCELED state
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    const taskResponse = await client.getTask({ id: taskId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+    const state = taskResponse.task?.status?.state ?? taskResponse.status?.state;
+    console.log(`Polled Task 2 state: ${state}`);
+    
+    if (state === TaskState.TASK_STATE_CANCELED) {
+      console.log("Task 2 explicitly canceled.");
+      cancelledTask2 = true;
+      break;
+    } else if (state === TaskState.TASK_STATE_COMPLETED) {
+      failedCancellation = true;
+      break;
     }
   }
 
