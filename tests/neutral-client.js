@@ -1,4 +1,5 @@
 const { ClientFactory } = require('@a2a-js/sdk/client');
+const { TaskState } = require('@a2a-js/sdk');
 
 async function run() {
   const agentUrl = process.env.AGENT_URL || 'http://localhost:4001';
@@ -25,12 +26,7 @@ async function run() {
     if (status.payload?.$case === 'task' || status.payload?.$case === 'statusUpdate') {
        const state = status.payload.value.status?.state || status.payload.value.state;
        console.log(`Task 1 state:`, state);
-       if (state === 2 || state === 3) {
-           // 2=COMPLETED in some SDK versions, but let's check for string or num
-           // In TS enum: TASK_STATE_COMPLETED is 3 or 4 depending on version. Wait, let's just log and see if it's 3 or 4
-       }
-       if (state === 2 || state === 'TASK_STATE_COMPLETED' || state === 3 && status.payload.value.status?.message?.parts?.[0]?.content?.value === 'Task finished') {
-           // Workaround for unknown exact enum value: check the message text or known enum
+       if (state === TaskState.TASK_STATE_COMPLETED) {
            console.log("Task 1 explicitly completed.");
            completedTask1 = true;
            clearTimeout(t1);
@@ -57,21 +53,20 @@ async function run() {
     if (status.payload?.$case === 'task' || status.payload?.$case === 'statusUpdate') {
        const state = status.payload.value.status?.state || status.payload.value.state;
        taskId2 = status.payload.value.id || status.payload.value.taskId || taskId2;
+       const contextId2 = status.payload.value.contextId; // use returned context
        console.log(`Task 2 created/updated: ${taskId2}, state: ${state}`);
        
        if (!cancelledTask2 && taskId2 && status.payload?.$case === 'task') {
           console.log(`Cancelling task ${taskId2}...`);
-          client.cancelTask({ taskId: taskId2, contextId: reqId }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } }).catch(e => console.error(e));
+          client.cancelTask({ taskId: taskId2, contextId: contextId2 }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } }).catch(e => console.error(e));
        }
 
-       if (state === 4 || state === 'TASK_STATE_CANCELED' || (state === 5 && status.payload.value.status?.message?.parts?.[0]?.content?.value === 'Task canceled')) {
+       if (state === TaskState.TASK_STATE_CANCELED) {
            console.log("Task 2 explicitly canceled.");
            cancelledTask2 = true;
            clearTimeout(t2);
-       } else if (state === 2 || state === 'TASK_STATE_COMPLETED' || (state === 3 && status.payload.value.status?.message?.parts?.[0]?.content?.value === 'Task finished')) {
-           if (!cancelledTask2) {
-               failedCancellation = true;
-           }
+       } else if (state === TaskState.TASK_STATE_COMPLETED) {
+           failedCancellation = true;
        }
     }
   }
