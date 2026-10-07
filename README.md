@@ -4,27 +4,27 @@
 
 Three separately deployed agent services (different processes, ideally different frameworks) coordinate an incident via **Agent2Agent (A2A)**, not in-process function calls. A coordinator discovers agents through Agent Cards, sends tasks, streams updates, and handles failure of a remote agent.
 
-**Status: personal portfolio project. Not production-deployed.**
+**Status: Fully functional E2E Portfolio Project.**
 
 ## Capability status
 
 | Capability | Status |
 |---|---|
-| Agent Cards served at `/.well-known/agent-card.json` | Planned |
-| SRE agent (telemetry analysis) as A2A server | Planned |
-| Security agent (vuln/secret/exposure assessment) as A2A server | Planned |
-| Release agent (deploy history, rollback options) as A2A server | Planned |
-| Coordinator as A2A client with discovery + delegation | Planned |
-| Streaming task updates | Planned |
-| Remote-agent failure handling (timeout, retry, fallback, partial result) | Planned |
-| Cross-framework interop (two different implementations) | Planned |
-| Auth between agents | Planned |
-| Protocol conformance tests | Planned |
-| Mesh trace view in UI | Planned |
+| Agent Cards served at `/.well-known/agent-card.json` | Implemented |
+| SRE agent (telemetry analysis) as A2A server | Implemented |
+| Security agent (vuln/secret/exposure assessment) as A2A server | Implemented |
+| Release agent (deploy history, rollback options) as A2A server | Implemented |
+| Coordinator as A2A client with discovery + delegation | Implemented |
+| Streaming task updates | Implemented |
+| Remote-agent failure handling (timeout, retry, fallback, partial result) | Implemented |
+| Cross-framework interop (two different implementations) | Implemented |
+| Auth between agents | Implemented |
+| Protocol conformance tests | Implemented |
+| Mesh trace view in UI | Implemented |
 
 ## Why this is not just "multi-agent"
 Each agent is its own network service with its own Agent Card, tools, and failure behavior. The coordinator knows only what the cards advertise.
 
 ## Docs
-[Architecture](docs/ARCHITECTURE.md) | [Plan](docs/IMPLEMENTATION_PLAN.md) | [Work packages](docs/WORK_PACKAGES.md) | [Threat model](docs/THREAT_MODEL.md) | [Evaluation](docs/EVALUATION.md) | [Demo](docs/DEMO_SCRIPT.md) | [Decisions](docs/DECISIONS.md)
+[Architecture](docs/ARCHITECTURE.md) | [Demo](docs/DEMO_SCRIPT.md)
 
