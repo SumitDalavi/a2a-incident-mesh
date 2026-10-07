@@ -73,9 +73,15 @@
               const msg = JSON.parse(event.data);
               const logBox = document.getElementById(d.taskId);
               if (logBox.innerHTML === 'Connecting stream...') logBox.innerHTML = '';
-              logBox.innerHTML += `> [${msg.status}] ${msg.log}<br>`;
-              logBox.scrollTop = logBox.scrollHeight;
-              if (msg.status === 'COMPLETED' || msg.status === 'FAILED') {
+              
+              const state = msg.statusUpdate ? msg.statusUpdate.state : msg.status;
+              const desc = msg.statusUpdate ? msg.statusUpdate.description : msg.log;
+              
+              if (desc) {
+                logBox.innerHTML += `> [${state}] ${desc}<br>`;
+                logBox.scrollTop = logBox.scrollHeight;
+              }
+              if (state === 'COMPLETED' || state === 'FAILED' || state === 'CANCELED') {
                 evtSource.close();
               }
             };

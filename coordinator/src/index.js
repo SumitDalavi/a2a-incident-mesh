@@ -6,50 +6,63 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Dynamic agent registry (in a real system, agents would register themselves via POST)
 const AGENT_URLS = ['http://localhost:4001', 'http://localhost:4002'];
 const agentRegistry = [];
 
 async function discoverAgents() {
-  agentRegistry.length = 0; // clear
+  agentRegistry.length = 0;
   for (const url of AGENT_URLS) {
     try {
       const res = await axios.get(`${url}/.well-known/agent-card.json`, { timeout: 2000 });
-      agentRegistry.push({ url, card: res.data });
-      console.log(`Discovered ${res.data.name} at ${url}`);
+      const card = res.data;
+      const capabilities = card.capabilities && card.capabilities.skills 
+        ? card.capabilities.skills.map(s => s.name) 
+        : [];
+      agentRegistry.push({ url, card, capabilities });
+      console.log(`Discovered ${card.name} at ${url}`);
     } catch (err) {
       console.warn(`Failed to discover agent at ${url}`);
     }
   }
 }
-discoverAgents(); // run on startup
+discoverAgents();
 
-// MSH-05: Coordinator API
 app.post('/api/dispatch', async (req, res) => {
-  const { incidentId, tasks } = req.body; // array of task types e.g. ['analyze-telemetry', 'check-cves']
+  const { incidentId, tasks } = req.body;
   
   if (!tasks || !Array.isArray(tasks)) return res.status(400).json({ error: 'tasks array required' });
 
   const delegations = [];
   
   for (const taskType of tasks) {
-    // Capability negotiation: find an agent that can do this
-    const capableAgent = agentRegistry.find(a => a.card.capabilities.includes(taskType));
+    const capableAgent = agentRegistry.find(a => a.capabilities.includes(taskType));
     
     if (capableAgent) {
       try {
-        const taskRes = await axios.post(`${capableAgent.url}/api/v1/tasks`, {
-          incidentId, type: taskType, payload: {}
-        }, {
-          headers: { 'Authorization': 'Bearer mesh-secret-token' }
+        const payload = {
+          message: {
+            messageId: require('crypto').randomUUID(),
+            text: taskType,
+            conversationId: incidentId,
+            sender: { id: "coordinator", role: "USER" }
+          }
+        };
+        const taskRes = await axios.post(`${capableAgent.url}/message:send`, payload, {
+          headers: { 
+            'Authorization': 'Bearer mesh-secret-token',
+            'Content-Type': 'application/a2a+json',
+            'A2A-Version': '1.0'
+          }
         });
+        
+        const task = taskRes.data.task || taskRes.data;
         
         delegations.push({
           taskType,
           agentName: capableAgent.card.name,
           agentUrl: capableAgent.url,
-          taskId: taskRes.data.taskId,
-          status: taskRes.data.status
+          taskId: task.id,
+          status: task.state || 'ACCEPTED'
         });
       } catch (err) {
         delegations.push({ taskType, agentName: capableAgent.card.name, status: 'FAILED', error: err.message });
@@ -66,7 +79,6 @@ app.get('/api/agents', (req, res) => {
   res.json(agentRegistry);
 });
 
-// SSE Proxy
 app.get('/api/stream/:agentUrl/:taskId', async (req, res) => {
   const { agentUrl, taskId } = req.params;
   const decodedUrl = decodeURIComponent(agentUrl);
@@ -76,9 +88,12 @@ app.get('/api/stream/:agentUrl/:taskId', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   try {
-    const streamRes = await axios.get(`${decodedUrl}/api/v1/tasks/${taskId}/stream`, {
+    const streamRes = await axios.get(`${decodedUrl}/tasks/${taskId}:subscribe`, {
       responseType: 'stream',
-      headers: { 'Authorization': 'Bearer mesh-secret-token' }
+      headers: { 
+        'Authorization': 'Bearer mesh-secret-token',
+        'A2A-Version': '1.0'
+      }
     });
     
     streamRes.data.pipe(res);
