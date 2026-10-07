@@ -19,17 +19,20 @@ const agentCard = {
 
 const taskStore = new InMemoryTaskStore();
 const cancelFlags = new Map();
+const contextIds = new Map();
 
 const executor = {
   async execute(requestContext, eventBus) {
     const taskId = requestContext.taskId || 'sec-task-' + Date.now();
     const type = requestContext.task?.type || requestContext.message?.text || 'check-cves';
+    const cId = requestContext.contextId || require('crypto').randomUUID();
+    contextIds.set(taskId, cId);
     
     cancelFlags.set(taskId, false);
     
     eventBus.publish(AgentEvent.task({
       id: taskId,
-      contextId: requestContext.contextId || require('crypto').randomUUID(),
+      contextId: cId,
       history: [],
       artifacts: [],
       metadata: { type },
@@ -89,9 +92,11 @@ const executor = {
   
   async cancelTask(taskId, eventBus) {
     cancelFlags.set(taskId, true);
+    const cId = typeof taskId === 'object' ? taskId.contextId : (contextIds.get(taskId) || '');
+    const id = typeof taskId === 'object' ? taskId.taskId : taskId;
     eventBus.publish(AgentEvent.statusUpdate({
-      taskId,
-      contextId: requestContext?.contextId || '',
+      taskId: id,
+      contextId: cId,
       status: { 
         state: TaskState.TASK_STATE_CANCELED,
         message: {

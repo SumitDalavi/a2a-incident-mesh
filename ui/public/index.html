@@ -49,7 +49,7 @@
       for (const url of AGENTS) {
         await fetch('http://localhost:3000/api/agents/register', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer mesh-secret-token' },
           body: JSON.stringify({ url })
         }).catch(e => console.error("Failed to register", url));
       }
@@ -92,34 +92,27 @@
             const logBox = document.getElementById(d.taskId);
             
             async function consumeStream() {
-              const response = await fetch(`${agentUrl}/api/v1/tasks/${d.taskId}/stream`, {
-                headers: { 'Authorization': 'Bearer mesh-secret-token' }
-              });
-              
-              const reader = response.body.getReader();
-              const decoder = new TextDecoder("utf-8");
-              
-              logBox.innerHTML = '';
-              while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\\n');
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    try {
-                      const msg = JSON.parse(line.substring(6));
-                      const state = msg.statusUpdate ? msg.statusUpdate.state : msg.state;
-                      const desc = msg.statusUpdate ? msg.statusUpdate.description : msg.description;
-                      if (desc) {
-                        logBox.innerHTML += `> [${state}] ${desc}<br>`;
-                        logBox.scrollTop = logBox.scrollHeight;
+              const poll = setInterval(async () => {
+                 try {
+                    const response = await fetch(`${agentUrl}/v1/agent/tasks/${d.taskId}`, {
+                      headers: { 'Authorization': 'Bearer mesh-secret-token' }
+                    });
+                    const msg = await response.json();
+                    
+                    logBox.innerHTML = '';
+                    if (msg.history) {
+                      for (const update of msg.history) {
+                        const state = update.state;
+                        const desc = update.message?.parts?.[0]?.content?.value;
+                        if (desc) logBox.innerHTML += `> [State ${state}] ${desc}<br>`;
                       }
-                    } catch (e) {}
-                  }
-                }
-              }
+                      logBox.scrollTop = logBox.scrollHeight;
+                      if (msg.status?.state === 2 || msg.status?.state === 4) {
+                         clearInterval(poll);
+                      }
+                    }
+                 } catch (e) {}
+              }, 1000);
             }
             consumeStream();
           } else {
