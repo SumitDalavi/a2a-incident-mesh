@@ -11,7 +11,8 @@ dev:
 	npm run start --workspace=coordinator
 
 test:
-	npm run test
+	node test.js
 
 clean:
 	npm run clean
+

@@ -43,9 +43,23 @@
   </div>
 
   <script>
+    const AGENTS = ['http://localhost:4001', 'http://localhost:4002'];
+
+    async function registerAgents() {
+      for (const url of AGENTS) {
+        await fetch('http://localhost:3000/api/agents/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        }).catch(e => console.error("Failed to register", url));
+      }
+    }
+
     async function dispatchIncident() {
       const container = document.getElementById('streams-container');
-      container.innerHTML = 'Delegating tasks...';
+      container.innerHTML = 'Registering agents & delegating tasks...';
+      
+      await registerAgents();
 
       try {
         const res = await fetch('http://localhost:3000/api/dispatch', {
@@ -60,35 +74,62 @@
         
         container.innerHTML = '';
         data.delegations.forEach(d => {
-          if (d.status === 'ACCEPTED') {
+          if (d.status === 'dispatched') {
             const box = document.createElement('div');
-            box.innerHTML = `<h3>${d.agentName} (${d.taskType})</h3><div class="stream-box" id="${d.taskId}">Connecting stream...</div>`;
+            box.innerHTML = `<h3>${d.agent} (${d.taskReq})</h3><div class="stream-box" id="${d.taskId}">Connecting stream...</div>`;
             container.appendChild(box);
             
-            // Connect SSE via proxy
-            const encodedUrl = encodeURIComponent(d.agentUrl);
-            const evtSource = new EventSource(`http://localhost:3000/api/stream/${encodedUrl}/${d.taskId}`);
+            // Reconstruct Agent URL based on taskReq
+            const agentUrl = d.taskReq === 'analyze-telemetry' ? 'http://localhost:4001' : 'http://localhost:4002';
             
-            evtSource.onmessage = function(event) {
-              const msg = JSON.parse(event.data);
-              const logBox = document.getElementById(d.taskId);
-              if (logBox.innerHTML === 'Connecting stream...') logBox.innerHTML = '';
+            // Connect SSE directly to agent using Bearer token
+            // Note: EventSource doesn't support custom headers easily. 
+            // The agents' index.js accepts 'mesh-secret-token'. 
+            // In a real app, we'd use fetch() to stream, but EventSource might bypass auth if we don't handle it.
+            // Wait, the agent code says: `if (!auth || auth !== 'Bearer mesh-secret-token') { return res.status(401).json({ error: 'Unauthorized' }); }`
+            // So we must use fetch to stream JSON!
+            
+            const logBox = document.getElementById(d.taskId);
+            
+            async function consumeStream() {
+              const response = await fetch(`${agentUrl}/api/v1/tasks/${d.taskId}/stream`, {
+                headers: { 'Authorization': 'Bearer mesh-secret-token' }
+              });
               
-              const state = msg.statusUpdate ? msg.statusUpdate.state : msg.status;
-              const desc = msg.statusUpdate ? msg.statusUpdate.description : msg.log;
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder("utf-8");
               
-              if (desc) {
-                logBox.innerHTML += `> [${state}] ${desc}<br>`;
-                logBox.scrollTop = logBox.scrollHeight;
+              logBox.innerHTML = '';
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\\n');
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const msg = JSON.parse(line.substring(6));
+                      const state = msg.statusUpdate ? msg.statusUpdate.state : msg.state;
+                      const desc = msg.statusUpdate ? msg.statusUpdate.description : msg.description;
+                      if (desc) {
+                        logBox.innerHTML += `> [${state}] ${desc}<br>`;
+                        logBox.scrollTop = logBox.scrollHeight;
+                      }
+                    } catch (e) {}
+                  }
+                }
               }
-              if (state === 'COMPLETED' || state === 'FAILED' || state === 'CANCELED') {
-                evtSource.close();
-              }
-            };
+            }
+            consumeStream();
+          } else {
+             const box = document.createElement('div');
+             box.innerHTML = `<h3>${d.taskReq}</h3><div class="stream-box" style="color: red">Error: ${d.error || d.reason}</div>`;
+             container.appendChild(box);
           }
         });
       } catch (err) {
-        alert('Failed to dispatch tasks');
+        container.innerHTML = 'Failed to dispatch tasks';
       }
     }
   </script>
