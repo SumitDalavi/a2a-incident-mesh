@@ -1,19 +1,29 @@
-const assert = require('assert');
-const fs = require('fs');
+const { spawn } = require('child_process');
 
 async function runTests() {
-  console.log("Running A2A Incident Mesh Tests...");
+  console.log("Starting A2A Mesh stack...");
+  const sreProcess = spawn('node', ['agents/sre-agent/src/index.js'], { shell: true, stdio: 'inherit' });
+  const secProcess = spawn('node', ['agents/sec-agent/src/index.js'], { shell: true });
+  const coordProcess = spawn('npx', ['ts-node', 'coordinator/src/index.ts'], { shell: true });
+
+  // Give services 3 seconds to spin up
+  await new Promise(r => setTimeout(r, 3000));
+  console.log("Running Behavioral Tests for A2A Incident Mesh...");
+
+  const neutralClient = spawn('node', ['tests/neutral-client.js'], { stdio: 'inherit', shell: true });
   
-  // Test: Neutral client exists and executes
-  assert(fs.existsSync(__dirname + '/tests/neutral-client.js'), "Gate 5 Failed: Neutral client not found.");
-  
-  const sreCode = fs.readFileSync(__dirname + '/agents/sre-agent/src/index.js', 'utf8');
-  assert(sreCode.includes('cancelFlags.set(taskId, true)'), "Gate 5 Failed: Cancellation loop leak in SRE agent.");
-  
-  console.log("✅ A2A Incident Mesh passed.");
+  neutralClient.on('exit', (code) => {
+     sreProcess.kill();
+     secProcess.kill();
+     coordProcess.kill();
+     if (code !== 0) {
+        console.error(`❌ Test Failed: Neutral client exited with code ${code}`);
+        process.exit(1);
+     } else {
+        console.log("✅ A2A Incident Mesh passed behavioral tests.");
+        process.exit(0);
+     }
+  });
 }
 
-runTests().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+runTests();

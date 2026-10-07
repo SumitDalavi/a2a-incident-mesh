@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { Client } from '@a2a-js/sdk/client';
+import { ClientFactory } from '@a2a-js/sdk/client';
 
 const app = express();
 app.use(cors());
@@ -12,10 +12,19 @@ const agentRegistry = new Map<string, { url: string, card: any }>();
 app.post('/api/agents/register', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL required' });
+  const auth = req.headers.authorization;
+  if (!auth || auth !== 'Bearer mesh-secret-token') {
+    return res.status(401).json({ error: 'Unauthorized to register agents' });
+  }
+  
+  if (!url.startsWith('http://localhost:')) {
+    return res.status(400).json({ error: 'Invalid agent URL destination' });
+  }
   
   try {
-    const client = new Client({ url, auth: { type: 'bearer', token: 'mesh-secret-token' } });
-    const card = await client.discover();
+    const factory = new ClientFactory();
+    const client = await factory.createFromUrl(url, undefined, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+    const card = client.agentCard;
     agentRegistry.set(url, { url, card });
     console.log(`Registered agent: ${card.name} at ${url}`);
     res.json({ success: true, agent: card.name });
@@ -39,9 +48,18 @@ app.post('/api/dispatch', async (req, res) => {
       const hasSkill = agent.card.skills?.some((s: any) => s.name === taskReq);
       if (hasSkill) {
         try {
-          const client = new Client({ url, auth: { type: 'bearer', token: 'mesh-secret-token' } });
-          const task = await client.createTask({ type: taskReq, parameters: {} });
-          delegations.push({ taskReq, agent: agent.card.name, taskId: task.id, status: 'dispatched' });
+          const factory = new ClientFactory();
+          const client = await factory.createFromUrl(url, undefined, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+          const taskStream = client.sendMessageStream({ message: { messageId: require('crypto').randomUUID(), text: taskReq } }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
+          
+          let taskId = 'unknown';
+          for await (const event of taskStream) {
+             if (event.payload?.$case === 'task') {
+                 taskId = event.payload.value.id;
+                 break;
+             }
+          }
+          delegations.push({ taskReq, agent: agent.card.name, taskId, status: 'dispatched' });
           handled = true;
           break; // Multi-step delegation implies passing the baton, here we dispatch appropriately.
         } catch (err: any) {

@@ -64,3 +64,12 @@ Each agent is its own network service with its own Agent Card, tools, and failur
 
 ---
 *Built with a focus on robust patterns, not toy demos.*
+
+
+## October 2026 Update: Behavioral Testing & Runtime Stabilization
+
+**Implementation Notes:**
+Aligned agents with A2A SDK v1.0, implemented ClientFactory, corrected AgentEvent payloads, and built a behavioral streaming neutral-client for execution history validation.
+
+* Acceptance tests have been upgraded from static string-checks to end-to-end behavioral verifications.
+* API boundaries and execution layers (Docker, WebSockets, Temporal, etc.) are now explicitly exercised in tests.

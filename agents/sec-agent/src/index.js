@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { DefaultRequestHandler, InMemoryTaskStore } = require('@a2a-js/sdk/server');
+const { DefaultRequestHandler, InMemoryTaskStore, AgentEvent } = require('@a2a-js/sdk/server');
 const { restHandler, agentCardHandler } = require('@a2a-js/sdk/server/express');
 const { TaskState } = require('@a2a-js/sdk');
 
@@ -27,11 +27,21 @@ const executor = {
     
     cancelFlags.set(taskId, false);
     
-    eventBus.publishTask({
+    eventBus.publish(AgentEvent.task({
       id: taskId,
-      state: TaskState.TASK_STATE_WORKING,
-      metadata: { type }
-    });
+      contextId: requestContext.contextId || require('crypto').randomUUID(),
+      history: [],
+      artifacts: [],
+      metadata: { type },
+      status: {
+         state: TaskState.TASK_STATE_WORKING,
+         message: {
+           role: 2,
+           messageId: require('crypto').randomUUID(),
+           parts: [{ content: { $case: 'text', value: 'Started' }, mediaType: 'text/plain' }]
+         }
+      }
+    }));
 
     const steps = [
       "Downloading SBOM for affected images...",
@@ -42,34 +52,55 @@ const executor = {
     ];
 
     for (const step of steps) {
+      await new Promise(r => setTimeout(r, 1200));
       if (cancelFlags.get(taskId)) {
         console.log(`Task ${taskId} execution loop halted due to cancellation.`);
         return;
       }
-      await new Promise(r => setTimeout(r, 1200));
-      eventBus.publishTaskStatus({
+      eventBus.publish(AgentEvent.statusUpdate({
         taskId,
-        state: TaskState.TASK_STATE_WORKING,
-        description: step
-      });
+        contextId: requestContext.contextId,
+        status: { 
+          state: TaskState.TASK_STATE_WORKING,
+          message: {
+             messageId: require('crypto').randomUUID(),
+             role: 2,
+             parts: [{ content: { $case: 'text', value: step }, mediaType: 'text/plain' }]
+          }
+        }
+      }));
     }
 
     if (!cancelFlags.get(taskId)) {
-      eventBus.publishTaskStatus({
+      eventBus.publish(AgentEvent.statusUpdate({
         taskId,
-        state: TaskState.TASK_STATE_COMPLETED,
-        description: 'Task finished'
-      });
+        contextId: requestContext.contextId,
+        status: { 
+          state: TaskState.TASK_STATE_COMPLETED,
+          message: {
+             messageId: require('crypto').randomUUID(),
+             role: 2,
+             parts: [{ content: { $case: 'text', value: 'Task finished' }, mediaType: 'text/plain' }]
+          }
+        }
+      }));
     }
   },
   
   async cancelTask(taskId, eventBus) {
     cancelFlags.set(taskId, true);
-    eventBus.publishTaskStatus({
+    eventBus.publish(AgentEvent.statusUpdate({
       taskId,
-      state: TaskState.TASK_STATE_CANCELED,
-      description: 'Task canceled'
-    });
+      contextId: requestContext?.contextId || '',
+      status: { 
+        state: TaskState.TASK_STATE_CANCELED,
+        message: {
+           messageId: require('crypto').randomUUID(),
+           role: 2,
+           parts: [{ content: { $case: 'text', value: 'Task canceled' }, mediaType: 'text/plain' }]
+        }
+      }
+    }));
   }
 };
 

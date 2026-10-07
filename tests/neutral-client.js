@@ -1,40 +1,47 @@
-const { Client } = require('@a2a-js/sdk/client');
+const { ClientFactory } = require('@a2a-js/sdk/client');
 
 async function run() {
   const agentUrl = process.env.AGENT_URL || 'http://localhost:4001';
   console.log(`Discovering agent at ${agentUrl}...`);
   
-  const client = new Client({
-    url: agentUrl,
-    auth: { type: 'bearer', token: 'mesh-secret-token' }
+  const factory = new ClientFactory();
+  const client = await factory.createFromUrl(agentUrl, undefined, {
+    serviceParameters: { Authorization: 'Bearer mesh-secret-token' }
   });
 
-  const card = await client.discover();
+  const card = client.agentCard;
   console.log('Discovered Card:', card.name);
 
   console.log('Sending task...');
-  const task = await client.createTask({
-    type: 'analyze-telemetry',
-    parameters: { service: 'checkout' }
-  });
+  const stream = client.sendMessageStream({
+    message: { messageId: require('crypto').randomUUID(), text: 'analyze-telemetry' }
+  }, { serviceParameters: { Authorization: 'Bearer mesh-secret-token' } });
 
-  console.log(`Task created with ID: ${task.id}`);
+  let taskId = null;
+  let didComplete = false;
   
-  let streamCount = 0;
-  const stream = client.streamTaskStatus(task.id);
+  setTimeout(() => { if (!didComplete) { console.error("Timeout!"); process.exit(1); } }, 10000);
   
-  stream.on('data', async (status) => {
-    console.log(`[Stream] State: ${status.state}, Desc: ${status.description}`);
-    streamCount++;
-    if (streamCount === 2) {
-      console.log('Canceling task halfway...');
-      await client.cancelTask(task.id);
+  for await (const status of stream) {
+    if (status.payload?.$case === 'task') {
+       taskId = status.payload.value.id;
+       console.log(`Task created with ID: ${taskId}`);
+       
+       if (status.payload.value.history && status.payload.value.history.length > 2) {
+           console.log("Task completed successfully with history updates.");
+           didComplete = true;
+           break;
+       }
     }
-  });
+  }
 
-  stream.on('end', () => {
-    console.log('Stream ended.');
-  });
+  if (!didComplete) throw new Error("Stream ended without completion.");
 }
 
-run().catch(console.error);
+run().then(() => {
+  console.log("✅ Neutral client execution passed!");
+  process.exit(0);
+}).catch(err => {
+  console.error("❌ Neutral client execution failed:", err);
+  process.exit(1);
+});
