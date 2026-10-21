@@ -1,5 +1,21 @@
 # Architecture: A2A Incident Mesh (MSH)
 
+## Architecture Diagram
+
+```mermaid
+graph TD
+    A[Incident Alert Stream] --> B[Coordinator Agent :3000]
+    B --> C[/.well-known/agent-card.json Discovery]
+    C --> D[SRE Specialist Agent :3001]
+    C --> E[Security Specialist Agent :3002]
+    B -->|JSON-RPC Task Delegation| D
+    B -->|JSON-RPC Task Delegation| E
+    D -->|Subtask Status & Telemetry| B
+    E -->|Threat Isolation Verdict| B
+    B --> F[Consensus Mitigation & Unified Audit]
+```
+
+
 ## Overview
 The A2A Incident Mesh is a distributed system where multiple specialized, autonomous agents negotiate capabilities and share workloads during incident response.
 
@@ -53,3 +69,18 @@ This resolves all behavioral and runtime constraints, ensuring robust CI/CD exec
 ## Phase 6: Deep Routing & Proxy Isolation (Final Validation)
 - **Isolated API Polling**: Closed the API contract gap by ensuring UI task polling routes exclusively through the central Coordinator proxy (`/api/tasks/:agent/:taskId`), rather than directly striking individual agents and breaking the mesh boundary.
 - **Strict Context Routing**: Refactored the ambiguous bidirectional ID map into explicit `taskIdToContextId` and `contextIdToTaskId` data structures within the agents. This ensures cancellations accurately target and terminate the correct underlying execution contexts without bleeding state or leaking resources.
+
+
+## Release & Container Distribution Architecture (v0.2.0 Update)
+
+### 1. Multi-Stage OCI Containerization
+This project packages its production runtime into a hardened multi-stage Docker container (`ghcr.io/sumitdalavi/a2a-incident-mesh`):
+- **Base Runtime:** Production-minimal base images (Alpine Linux / Python-slim).
+- **Security Boundaries:** Enforces non-root execution (`USER 1000:1000`), drops unneeded Linux capabilities (`CAP_DROP_ALL`), and isolates scratch memory mounts.
+- **Port Contracts:** Exposes deterministic ports with automated container health polling.
+
+### 2. Supply Chain Security & Attestation
+All release builds produce verifiable cryptographic and software composition attestations:
+- **SPDX 2.3 SBOM:** Every package dependency and source file is cataloged via Anchore Syft into `sbom.spdx.json`.
+- **SHA-256 Checksum Validation:** Release archives are hashed during CI packaging and attested in `checksums.txt`.
+- **Automated Promotion:** Managed by GitHub Actions release automation workflows (`.github/workflows/release.yml`) with tokenized write scopes (`packages: write`, `contents: write`).

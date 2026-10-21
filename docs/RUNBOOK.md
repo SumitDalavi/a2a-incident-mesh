@@ -63,3 +63,60 @@ This resolves all behavioral and runtime constraints, ensuring robust CI/CD exec
 ## Phase 6: Deep Routing & Proxy Isolation (Final Validation)
 - **Isolated API Polling**: Closed the API contract gap by ensuring UI task polling routes exclusively through the central Coordinator proxy (`/api/tasks/:agent/:taskId`), rather than directly striking individual agents and breaking the mesh boundary.
 - **Strict Context Routing**: Refactored the ambiguous bidirectional ID map into explicit `taskIdToContextId` and `contextIdToTaskId` data structures within the agents. This ensures cancellations accurately target and terminate the correct underlying execution contexts without bleeding state or leaking resources.
+
+
+## Production Operations & Release Runbook (v0.2.0 Update)
+
+### 1. Production Container Invocation (GHCR)
+```bash
+# Pull production image:
+docker pull ghcr.io/sumitdalavi/a2a-incident-mesh:v0.2.0
+
+# Run mesh coordinator and agent workers:
+docker run -d \
+  --name a2a-incident-mesh \
+  -p 3000:3000 -p 3001:3001 -p 3002:3002 \
+  ghcr.io/sumitdalavi/a2a-incident-mesh:v0.2.0
+
+# Query dynamic agent topology:
+curl http://localhost:3000/api/mesh/topology
+```
+
+### 2. A2A Protocol Agent Discovery & Task Dispatch
+```bash
+# Inspect agent capability card:
+curl http://localhost:3001/.well-known/agent-card.json
+
+# Dispatch structured collaborative task to mesh:
+curl -X POST http://localhost:3000/api/mesh/dispatch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "incidentId": "INC-8821",
+    "subtasks": [
+      {"target": "sre-agent", "action": "analyze_cpu_throttling", "service": "payment-api"},
+      {"target": "sec-agent", "action": "inspect_egress_traffic", "namespace": "prod"}
+    ]
+  }'
+```
+
+### 3. Release Integrity & Verification Runbook
+To verify the authentic origin and file integrity of release packages:
+```bash
+# Download distribution package and checksums:
+gh release download v0.2.0 --repo SumitDalavi/a2a-incident-mesh --pattern "*.tar.gz" --pattern "checksums.txt"
+
+# Assert cryptographic match:
+sha256sum -c checksums.txt
+
+# Inspect SPDX 2.3 Software Bill of Materials:
+gh release download v0.2.0 --repo SumitDalavi/a2a-incident-mesh --pattern "sbom.spdx.json"
+cat sbom.spdx.json | jq .packages[0].name
+```
+
+### 4. Operational Failure Modes & Troubleshooting
+- **Port Collisions:** If the host port is in use, remap using `-p <ALTERNATIVE_PORT>:<CONTAINER_PORT>`.
+- **Docker Daemon Permissions:** For tools requiring container orchestrator control (`agent-sandbox-platform`), ensure `/var/run/docker.sock` has read/write permissions for the runner user.
+- **GHCR Pull Authentication:** If pulling from GHCR encounters rate limits or private scope:
+  ```bash
+  echo "$GITHUB_TOKEN" | docker login ghcr.io -u <GITHUB_USERNAME> --password-stdin
+  ```
