@@ -1,0 +1,4 @@
+# Classify generated/transpiled JavaScript and tests so GitHub Linguist indexes TypeScript as primary
+agents/**/src/*.js linguist-generated=true
+test.js linguist-detectable=false
+tests/** linguist-detectable=false
