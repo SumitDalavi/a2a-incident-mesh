@@ -129,7 +129,6 @@ This platform operates in **Dual-Mode**, dynamically selecting between live dist
 | **SRE Telemetry** | `PROMETHEUS_URL` / `DATADOG_API_KEY` | Queries live cluster metrics during automated incident triage | Emits structured telemetry simulation fixtures |
 | **Security Scanning** | `TRIVY_SERVER_URL` / `CVE_DB_PATH` | Queries live vulnerability scanners for CVE blast-radius analysis | Emits deterministic CVE advisory simulation fixtures |
 
-
 ---
 
 ## 👨‍💻 Author
