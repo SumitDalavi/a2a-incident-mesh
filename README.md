@@ -6,7 +6,6 @@
 [![SBOM](https://img.shields.io/badge/SBOM-SPDX%202.3-blueviolet?logo=spdx)](https://github.com/SumitDalavi/a2a-incident-mesh/releases/tag/v0.2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-> **Maturity:** Fully functional E2E Portfolio Project  
 > Distributed via GitHub Container Registry (`ghcr.io/sumitdalavi/a2a-incident-mesh:v0.2.0`) and tagged GitHub Releases with Anchore SPDX 2.3 SBOM and SHA-256 digest attestation.
 
 ---
@@ -119,18 +118,17 @@ cat sbom.spdx.json | jq .spdxVersion
 
 ---
 
-## October 2026 Update: Behavioral Testing & Runtime Stabilization
+## 🔌 Dual-Mode Execution: Live-First with Graceful Mock Fallback
 
-**Implementation Notes:**
-Aligned agents with A2A SDK v1.0, implemented ClientFactory, corrected AgentEvent payloads, and built a behavioral streaming neutral-client for execution history validation.
+This platform operates in **Dual-Mode**, dynamically selecting between live distributed agent services and local in-process simulation based on environment variables:
 
-* Acceptance tests have been upgraded from static string-checks to end-to-end behavioral verifications.
-* API boundaries and execution layers (Docker, WebSockets, Temporal, etc.) are now explicitly exercised in tests.
+| Component | Environment Variable | Live Mode Behavior | Fallback Mode (Unset / Empty) |
+|---|---|---|---|
+| **Agent Discovery** | `A2A_REGISTRY_URL` / `ALLOW_REMOTE_AGENTS` | Discovers remote agent cards across distributed Kubernetes pods | Confines discovery to local loopback services (`http://localhost:*`) |
+| **Mesh Authentication** | `MESH_SECRET_TOKEN` | Enforces cryptographic Bearer token validation across agent RPC calls | Uses default development token `mesh-secret-token` |
+| **SRE Telemetry** | `PROMETHEUS_URL` / `DATADOG_API_KEY` | Queries live cluster metrics during automated incident triage | Emits structured telemetry simulation fixtures |
+| **Security Scanning** | `TRIVY_SERVER_URL` / `CVE_DB_PATH` | Queries live vulnerability scanners for CVE blast-radius analysis | Emits deterministic CVE advisory simulation fixtures |
 
-## Maturity Claims
-- **Implemented (Tested):** Task cancellation, event stream polling, proxy API routing, SDK interop.
-- **Mocked:** The SRE telemetry and Security CVE checks are interoperability fixtures, not actual deep analysis.
-- **Deferred:** Complete RBAC mesh policies.
 
 ---
 
@@ -138,4 +136,7 @@ Aligned agents with A2A SDK v1.0, implemented ClientFactory, corrected AgentEven
 **Sumit Dalavi** — Senior DevSecOps / Platform Engineer  
 [GitHub](https://github.com/SumitDalavi) | [LinkedIn](https://in.linkedin.com/in/sumit-dalavi-762838129)
 
-*Built with a focus on robust patterns, not toy demos.*
+---
+
+## 📄 License
+This project is licensed under the [MIT License](LICENSE). Copyright (c) 2026 Sumit Dalavi.

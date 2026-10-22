@@ -12,12 +12,13 @@ const agentRegistry = new Map<string, { url: string, card: any }>();
 app.post('/api/agents/register', async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'URL required' });
-  const auth = req.headers.authorization;
-  if (!auth || auth !== 'Bearer mesh-secret-token') {
+  const expectedToken = process.env.MESH_SECRET_TOKEN || 'mesh-secret-token';
+  if (!auth || auth !== `Bearer ${expectedToken}`) {
     return res.status(401).json({ error: 'Unauthorized to register agents' });
   }
   
-  if (!url.startsWith('http://localhost:')) {
+  const isAllowed = url.startsWith('http://localhost:') || url.startsWith('http://127.0.0.1:') || process.env.ALLOW_REMOTE_AGENTS === 'true';
+  if (!isAllowed) {
     return res.status(400).json({ error: 'Invalid agent URL destination' });
   }
   
